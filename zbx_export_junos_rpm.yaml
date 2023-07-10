@@ -1,0 +1,138 @@
+zabbix_export:
+  version: '6.0'
+  date: '2023-07-10T10:00:32Z'
+  groups:
+    - uuid: 36bff6c29af64692839d077febfc7079
+      name: 'Templates/Network devices'
+  templates:
+    - uuid: f22d28aa79664bea8aa046b6c7be2538
+      template: 'Juniper RPM'
+      name: 'Juniper RPM'
+      description: |
+        > show snmp mib walk jnxRpmResSampleValue 
+        > show snmp mib walk jnxRpmResSumPercentLost
+      groups:
+        - name: 'Templates/Network devices'
+      discovery_rules:
+        - uuid: d13567dab9754998917cd9b7deeff992
+          name: 'JunOS RPM'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#OFFSET},1.3.6.1.4.1.2636.3.50.1.1.1.2]'
+          key: junos.rpm
+          delay: 1h
+          item_prototypes:
+            - uuid: caae7140be8d4a97a80c9d36a8ffcb76
+              name: 'RPM {#OWNER} {#TARGET} Round trip jitter'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.4.1.2636.3.50.1.1.1.2.{#SNMPINDEX}.2'
+              key: 'junos.rpm.jitter[{#OWNER},{#TARGET}]'
+              value_type: FLOAT
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.001'
+              tags:
+                - tag: Application
+                  value: RPM
+                - tag: 'RPM Owner'
+                  value: '{#OWNER}'
+                - tag: 'RPM Target'
+                  value: '{#TARGET}'
+            - uuid: 25807cfe011c45baa697052b2eeba9ba
+              name: 'RPM {#OWNER} {#TARGET} PercentLost Current'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.4.1.2636.3.50.1.2.1.4.{#SNMPINDEX}.1'
+              key: 'junos.rpm.percentlost.current[{#OWNER},{#TARGET}]'
+              value_type: FLOAT
+              units: '%'
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.000001'
+              tags:
+                - tag: Application
+                  value: RPM
+                - tag: 'RPM Owner'
+                  value: '{#OWNER}'
+                - tag: 'RPM Target'
+                  value: '{#TARGET}'
+            - uuid: e8406386bbff49e1818f17d0ded34d2f
+              name: 'RPM {#OWNER} {#TARGET} PercentLost Last'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.4.1.2636.3.50.1.2.1.4.{#SNMPINDEX}.2'
+              key: 'junos.rpm.percentlost.last[{#OWNER},{#TARGET}]'
+              value_type: FLOAT
+              units: '%'
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.000001'
+              tags:
+                - tag: Application
+                  value: RPM
+                - tag: 'RPM Owner'
+                  value: '{#OWNER}'
+                - tag: 'RPM Target'
+                  value: '{#TARGET}'
+            - uuid: 5ace3a7c8f7940539219ebf3c40c97a3
+              name: 'RPM {#OWNER} {#TARGET} RTT'
+              type: SNMP_AGENT
+              snmp_oid: '1.3.6.1.4.1.2636.3.50.1.1.1.2.{#SNMPINDEX}.1'
+              key: 'junos.rpm.rtt[{#OWNER},{#TARGET}]'
+              value_type: FLOAT
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.001'
+              tags:
+                - tag: Application
+                  value: RPM
+                - tag: 'RPM Owner'
+                  value: '{#OWNER}'
+                - tag: 'RPM Target'
+                  value: '{#TARGET}'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  if (value === '') {
+                      return value;
+                  } else {
+                      value = JSON.parse(value);
+                      function charstostr(arr) {
+                          val = '';
+                          arr.forEach(function (char) {
+                              val += String.fromCharCode(char);
+                          });
+                          return val;
+                      }
+                  
+                      function oidtostr(oid) {
+                          var tempoid = oid.split('.').map(function (item) {
+                              return parseInt(item, 10);
+                          });
+                          tempoid.shift()
+                          index1 = tempoid.indexOf(10)
+                  
+                          return {
+                              '{#SNMPINDEX}': oid,
+                              '{#OWNER}': charstostr(tempoid.slice(0, index1)),
+                              '{#TARGET}': charstostr(tempoid.slice(index1 + 1)),
+                          }
+                      }
+                      oids = [];
+                      value.forEach(function (arrayItem) {
+                          oid = arrayItem['{#SNMPINDEX}'].split('.');
+                          oid.pop();
+                          oid = oid.join('.');
+                          oids.push(oid);
+                      });
+                      function onlyUnique(value, index, array) {
+                          return array.indexOf(value) === index;
+                      }
+                      var oids_unique = oids.filter(onlyUnique);
+                      return JSON.stringify(oids_unique.map(function (item) {
+                          return oidtostr(item);
+                      }));
+                  }
+                  
